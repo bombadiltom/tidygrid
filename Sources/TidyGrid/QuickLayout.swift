@@ -53,7 +53,7 @@ final class QuickLayoutController: NSObject, NSWindowDelegate {
                                         x: rect.x, y: rect.y, width: rect.width, height: rect.height)
                 self.close()
                 AX.setFrame(target, layout.frame(in: screen.axVisibleFrame))
-                NSRunningApplication(processIdentifier: pid)?.activate()
+                NSRunningApplication(processIdentifier: pid)?.activate(options: [])
             }))
         w.setFrameOrigin(CGPoint(x: vis.midX - width / 2, y: vis.midY - height / 2))
         window = w
@@ -61,7 +61,7 @@ final class QuickLayoutController: NSObject, NSWindowDelegate {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             if event.keyCode == 53 { // Esc
                 self?.close()
-                NSRunningApplication(processIdentifier: pid)?.activate()
+                NSRunningApplication(processIdentifier: pid)?.activate(options: [])
                 return nil
             }
             return event

@@ -1,6 +1,6 @@
 # TidyGrid
 
-A small menu bar app for macOS 14+ that works like the retired Window Tidy:
+A small menu bar app for macOS 12+ that works like the retired Window Tidy:
 drag any window by its title bar, a row of layout icons pops up, drop the window on one and it snaps into place.
 
 - **Layouts**: as many as you like, each with its own grid. Edit them in Settings → Layouts (drag across the grid to choose the area).
@@ -15,8 +15,9 @@ TidyGrid needs Accessibility access (System Settings → Privacy & Security → 
 ## Build
 
 ```bash
-./build.sh           # builds build/TidyGrid.app
-./build.sh install   # also copies it to /Applications and starts it
+./build.sh                          # builds build/TidyGrid.app (Apple silicon + Intel)
+./build.sh install                  # also copies it to /Applications and starts it
+./build.sh deploy macmini macmini2  # installs and starts it on other Macs over SSH
 ```
 
 The app is signed with your "Apple Development" certificate when one exists, so the Accessibility permission survives rebuilds.

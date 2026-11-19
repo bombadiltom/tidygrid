@@ -1,10 +1,14 @@
 #!/bin/bash
-# Builds TidyGrid.app into ./build. Pass "install" to copy it to /Applications and start it.
+# Builds TidyGrid.app (Apple silicon + Intel) into ./build.
+#   ./build.sh                    build only
+#   ./build.sh install            also copy to /Applications here and start it
+#   ./build.sh deploy HOST...     also copy to /Applications on each SSH host and start it there
 set -euo pipefail
 cd "$(dirname "$0")"
 
-swift build -c release
-BIN="$(swift build -c release --show-bin-path)/TidyGrid"
+ARCHS=(--arch arm64 --arch x86_64)
+swift build -c release "${ARCHS[@]}"
+BIN="$(swift build -c release "${ARCHS[@]}" --show-bin-path)/TidyGrid"
 
 APP=build/TidyGrid.app
 rm -rf "$APP"
@@ -19,12 +23,25 @@ if ! codesign --force --options runtime --timestamp=none --sign "$IDENTITY" "$AP
   echo "No '$IDENTITY' certificate found, signing ad hoc (Accessibility must be granted again after each build)."
   codesign --force --sign - "$APP"
 fi
-echo "Built $APP"
+echo "Built $APP ($(lipo -archs "$APP/Contents/MacOS/TidyGrid"))"
 
-if [[ "${1:-}" == "install" ]]; then
-  pkill -x TidyGrid || true
-  rm -rf /Applications/TidyGrid.app
-  cp -R "$APP" /Applications/
-  open /Applications/TidyGrid.app
-  echo "Installed /Applications/TidyGrid.app"
-fi
+case "${1:-}" in
+  install)
+    pkill -x TidyGrid || true
+    rm -rf /Applications/TidyGrid.app
+    cp -R "$APP" /Applications/
+    open /Applications/TidyGrid.app
+    echo "Installed /Applications/TidyGrid.app"
+    ;;
+  deploy)
+    shift
+    [[ $# -gt 0 ]] || { echo "usage: ./build.sh deploy HOST..."; exit 1; }
+    for host in "$@"; do
+      echo "Deploying to $host"
+      ssh "$host" 'pkill -x TidyGrid || true; mkdir -p /tmp/tidygrid-deploy && rm -rf /tmp/tidygrid-deploy/TidyGrid.app'
+      rsync -a "$APP" "$host:/tmp/tidygrid-deploy/"
+      ssh "$host" 'rm -rf /Applications/TidyGrid.app && mv /tmp/tidygrid-deploy/TidyGrid.app /Applications/ && open /Applications/TidyGrid.app'
+      echo "Installed /Applications/TidyGrid.app on $host"
+    done
+    ;;
+esac

@@ -127,7 +127,6 @@ private struct LayoutEditor: View {
 private struct GeneralTab: View {
     @ObservedObject private var settings = AppSettings.shared
     @State private var trusted = AX.isTrusted
-    @State private var openAtLogin = SMAppService.mainApp.status == .enabled
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -150,9 +149,7 @@ private struct GeneralTab: View {
             }
 
             Section("Layout icons") {
-                LabeledContent("Icon size") {
-                    Slider(value: $settings.prefs.iconSize, in: 40...140, step: 4)
-                }
+                Slider(value: $settings.prefs.iconSize, in: 40...140, step: 4) { Text("Icon size") }
                 Picker("Position", selection: $settings.prefs.position) {
                     ForEach(PanelPosition.allCases) { Text($0.title).tag($0) }
                 }
@@ -172,18 +169,38 @@ private struct GeneralTab: View {
                        isOn: $settings.prefs.layoutShortcuts)
             }
 
-            Section {
-                Toggle("Open TidyGrid at login", isOn: Binding(get: { openAtLogin }, set: { on in
-                    do {
-                        if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
-                    } catch {
-                        NSSound.beep()
-                    }
-                    openAtLogin = SMAppService.mainApp.status == .enabled
-                }))
+            if #available(macOS 13.0, *) {
+                Section { OpenAtLoginToggle() }
             }
         }
-        .formStyle(.grouped)
+        .groupedFormStyle()
         .onReceive(timer) { _ in trusted = AX.isTrusted }
+    }
+}
+
+/// SMAppService only exists on macOS 13 and later; older systems use Login Items in System Preferences.
+@available(macOS 13.0, *)
+private struct OpenAtLoginToggle: View {
+    @State private var on = SMAppService.mainApp.status == .enabled
+
+    var body: some View {
+        Toggle("Open TidyGrid at login", isOn: Binding(get: { on }, set: { newValue in
+            do {
+                if newValue { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+            } catch {
+                NSSound.beep()
+            }
+            on = SMAppService.mainApp.status == .enabled
+        }))
+    }
+}
+
+private extension View {
+    @ViewBuilder func groupedFormStyle() -> some View {
+        if #available(macOS 13.0, *) {
+            formStyle(.grouped)
+        } else {
+            padding(20)
+        }
     }
 }

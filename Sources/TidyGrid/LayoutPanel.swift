@@ -17,14 +17,19 @@ private enum Metrics {
 private struct PanelView: View {
     @ObservedObject var model: PanelModel
 
+    private var icons: some View {
+        ForEach(model.layouts) { layout in
+            LayoutIcon(layout: layout, highlighted: model.hovered == layout.id)
+                .frame(width: model.iconSize.width, height: model.iconSize.height)
+        }
+    }
+
     var body: some View {
-        let stack = model.vertical
-            ? AnyLayout(VStackLayout(spacing: Metrics.spacing))
-            : AnyLayout(HStackLayout(spacing: Metrics.spacing))
-        stack {
-            ForEach(model.layouts) { layout in
-                LayoutIcon(layout: layout, highlighted: model.hovered == layout.id)
-                    .frame(width: model.iconSize.width, height: model.iconSize.height)
+        Group {
+            if model.vertical {
+                VStack(spacing: Metrics.spacing) { icons }
+            } else {
+                HStack(spacing: Metrics.spacing) { icons }
             }
         }
         .padding(Metrics.padding)
@@ -52,7 +57,7 @@ final class LayoutPanel {
     init() {
         panel = LayoutPanel.makeOverlayPanel(level: .popUpMenu)
         let host = NSHostingView(rootView: PanelView(model: model))
-        host.sizingOptions = []
+        if #available(macOS 13.0, *) { host.sizingOptions = [] }
         panel.contentView = host
         panel.hasShadow = true
 
