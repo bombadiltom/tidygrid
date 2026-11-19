@@ -29,6 +29,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             AX.promptForTrust()
             showSettings()
         }
+
+        SelfTest.runIfRequested()
     }
 
     // MARK: Hot keys

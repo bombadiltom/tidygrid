@@ -65,7 +65,12 @@ enum AX {
     static func focusedWindow() -> AXUIElement? {
         guard let app = NSWorkspace.shared.frontmostApplication,
               app.processIdentifier != getpid() else { return nil }
-        let axApp = AXUIElementCreateApplication(app.processIdentifier)
+        return focusedWindow(pid: app.processIdentifier)
+    }
+
+    /// The focused window of the given app.
+    static func focusedWindow(pid: pid_t) -> AXUIElement? {
+        let axApp = AXUIElementCreateApplication(pid)
         return element(axApp, kAXFocusedWindowAttribute) ?? element(axApp, kAXMainWindowAttribute)
     }
 
@@ -106,11 +111,32 @@ enum AX {
         var size = r.size
         let pos = AXValueCreate(.cgPoint, &origin)!
         let sz = AXValueCreate(.cgSize, &size)!
-        // Position first so the size fits on the target screen, then size, then position again
-        // in case the app clamped the first move.
-        AXUIElementSetAttributeValue(w, kAXPositionAttribute as CFString, pos)
-        AXUIElementSetAttributeValue(w, kAXSizeAttribute as CFString, sz)
-        AXUIElementSetAttributeValue(w, kAXPositionAttribute as CFString, pos)
+        // Resize before moving: moving a big window first can leave it hanging over onto a
+        // neighbouring screen, and macOS then refuses or clamps the resize. Resize again after the
+        // move, because the first resize may have been limited by the screen the window started on.
+        // Repeat once if the app still nudged the window (it may just have a minimum size).
+        for _ in 0..<2 {
+            AXUIElementSetAttributeValue(w, kAXSizeAttribute as CFString, sz)
+            AXUIElementSetAttributeValue(w, kAXPositionAttribute as CFString, pos)
+            AXUIElementSetAttributeValue(w, kAXSizeAttribute as CFString, sz)
+            guard let f = frame(w) else { break }
+            if abs(f.minX - r.minX) <= 1, abs(f.minY - r.minY) <= 1,
+               abs(f.width - r.width) <= 1, abs(f.height - r.height) <= 1 { break }
+        }
+
+        // A window with a minimum size larger than the target can end up past the screen edge
+        // (a Right Third that cannot get that narrow). Slide it back onto the screen.
+        if let f = frame(w),
+           let screen = NSScreen.screens.first(where: { $0.axFrame.contains(CGPoint(x: r.midX, y: r.midY)) }) {
+            let vis = screen.axVisibleFrame
+            var p = f.origin
+            if f.maxX > vis.maxX { p.x = max(vis.minX, vis.maxX - f.width) }
+            if f.maxY > vis.maxY { p.y = max(vis.minY, vis.maxY - f.height) }
+            if p != f.origin {
+                var o = p
+                AXUIElementSetAttributeValue(w, kAXPositionAttribute as CFString, AXValueCreate(.cgPoint, &o)!)
+            }
+        }
 
         if enhanced, let app {
             AXUIElementSetAttributeValue(app, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)

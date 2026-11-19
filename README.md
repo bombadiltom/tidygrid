@@ -21,3 +21,8 @@ TidyGrid needs Accessibility access (System Settings → Privacy & Security → 
 ```
 
 The app is signed with your "Apple Development" certificate when one exists, so the Accessibility permission survives rebuilds.
+
+## Diagnostics
+
+`/Applications/TidyGrid.app/Contents/MacOS/TidyGrid --self-test com.apple.finder` moves Finder's front window
+through every layout on every screen and writes wanted vs. actual frames to `~/Library/Logs/TidyGrid-selftest.log`.
