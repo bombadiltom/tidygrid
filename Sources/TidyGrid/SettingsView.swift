@@ -40,6 +40,10 @@ private struct LayoutsTab: View {
                     Button { removeSelected() } label: { Image(systemName: "minus").frame(width: 24, height: 20) }
                         .disabled(selection == nil)
                     Spacer()
+                    Button("Sort") { settings.prefs.layouts = settings.prefs.layouts.sortedLeftToRight() }
+                        .controlSize(.small)
+                        .help("Order the layouts by their position on the screen, left to right")
+                        .padding(.trailing, 8)
                     Button("Reset") { settings.prefs.layouts = GridLayout.defaults; selection = nil }
                         .controlSize(.small)
                         .padding(.trailing, 6)

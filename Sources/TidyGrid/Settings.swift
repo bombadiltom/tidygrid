@@ -57,17 +57,51 @@ struct GridLayout: Codable, Identifiable, Equatable, Hashable {
     }
 
     static let defaults: [GridLayout] = [
+        GridLayout(name: "Left Third", columns: 3, rows: 1, x: 0, y: 0, width: 1, height: 1),
         GridLayout(name: "Left Half", columns: 2, rows: 1, x: 0, y: 0, width: 1, height: 1),
-        GridLayout(name: "Right Half", columns: 2, rows: 1, x: 1, y: 0, width: 1, height: 1),
-        GridLayout(name: "Full Screen", columns: 1, rows: 1, x: 0, y: 0, width: 1, height: 1),
-        GridLayout(name: "Center", columns: 6, rows: 6, x: 1, y: 1, width: 4, height: 4),
         GridLayout(name: "Left Two Thirds", columns: 3, rows: 1, x: 0, y: 0, width: 2, height: 1),
+        GridLayout(name: "Full Screen", columns: 1, rows: 1, x: 0, y: 0, width: 1, height: 1),
+        GridLayout(name: "Right Two Thirds", columns: 3, rows: 1, x: 1, y: 0, width: 2, height: 1),
+        GridLayout(name: "Right Half", columns: 2, rows: 1, x: 1, y: 0, width: 1, height: 1),
         GridLayout(name: "Right Third", columns: 3, rows: 1, x: 2, y: 0, width: 1, height: 1),
+    ].sortedLeftToRight()
+
+    /// Layouts that used to be defaults. Saved lists from before version 3 drop them once.
+    static let retiredDefaults: [GridLayout] = [
+        GridLayout(name: "Center", columns: 6, rows: 6, x: 1, y: 1, width: 4, height: 4),
         GridLayout(name: "Top Left", columns: 2, rows: 2, x: 0, y: 0, width: 1, height: 1),
-        GridLayout(name: "Top Right", columns: 2, rows: 2, x: 1, y: 0, width: 1, height: 1),
         GridLayout(name: "Bottom Left", columns: 2, rows: 2, x: 0, y: 1, width: 1, height: 1),
+        GridLayout(name: "Top Right", columns: 2, rows: 2, x: 1, y: 0, width: 1, height: 1),
         GridLayout(name: "Bottom Right", columns: 2, rows: 2, x: 1, y: 1, width: 1, height: 1),
     ]
+
+    /// Position and size as fractions of the screen: left, top, width, height.
+    var fractions: [Double] {
+        [Double(x) / Double(columns), Double(y) / Double(rows),
+         Double(width) / Double(columns), Double(height) / Double(rows)]
+    }
+
+    /// True when both layouts cover the same part of the screen, even with different grids.
+    func coversSameArea(as other: GridLayout) -> Bool {
+        zip(fractions, other.fractions).allSatisfy { abs($0 - $1) < 0.001 }
+    }
+}
+
+extension Array where Element == GridLayout {
+    /// Orders layouts by where they sit on the screen: by horizontal center first,
+    /// then top to bottom, then larger before smaller.
+    func sortedLeftToRight() -> [GridLayout] {
+        func key(_ l: GridLayout) -> [Double] {
+            let f = l.fractions
+            return [f[0] + f[2] / 2, f[1] + f[3] / 2, -(f[2] * f[3])]
+        }
+        return sorted { a, b in
+            for (ka, kb) in zip(key(a), key(b)) where abs(ka - kb) > 0.001 {
+                return ka < kb
+            }
+            return false
+        }
+    }
 }
 
 enum PanelPosition: String, Codable, CaseIterable, Identifiable {
@@ -105,6 +139,10 @@ struct Prefs: Codable, Equatable {
     var quickColumns: Int = 6
     var quickRows: Int = 4
     var layoutShortcuts: Bool = false
+    /// Bumped when new default layouts ship, so they are merged into saved settings once.
+    var defaultsVersion: Int = Prefs.currentDefaultsVersion
+
+    static let currentDefaultsVersion = 3
 
     init() {}
 
@@ -120,6 +158,21 @@ struct Prefs: Codable, Equatable {
         quickColumns = try c.decodeIfPresent(Int.self, forKey: .quickColumns) ?? d.quickColumns
         quickRows = try c.decodeIfPresent(Int.self, forKey: .quickRows) ?? d.quickRows
         layoutShortcuts = try c.decodeIfPresent(Bool.self, forKey: .layoutShortcuts) ?? d.layoutShortcuts
+        defaultsVersion = try c.decodeIfPresent(Int.self, forKey: .defaultsVersion) ?? 1
+    }
+
+    /// Brings a saved list up to the current defaults once: drops retired defaults,
+    /// adds new ones it does not cover yet, and sorts it left to right.
+    mutating func mergeNewDefaults() {
+        guard defaultsVersion < Prefs.currentDefaultsVersion else { return }
+        if defaultsVersion < 3 {
+            layouts.removeAll { l in GridLayout.retiredDefaults.contains { l.coversSameArea(as: $0) } }
+        }
+        for d in GridLayout.defaults where !layouts.contains(where: { $0.coversSameArea(as: d) }) {
+            layouts.append(d)
+        }
+        layouts = layouts.sortedLeftToRight()
+        defaultsVersion = Prefs.currentDefaultsVersion
     }
 }
 
@@ -133,8 +186,11 @@ final class AppSettings: ObservableObject {
 
     private init() {
         if let data = UserDefaults.standard.data(forKey: Self.key),
-           let p = try? JSONDecoder().decode(Prefs.self, from: data) {
+           var p = try? JSONDecoder().decode(Prefs.self, from: data) {
+            let before = p
+            p.mergeNewDefaults()
             prefs = p
+            if p != before { save() }
         } else {
             prefs = Prefs()
         }
