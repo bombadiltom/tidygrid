@@ -13,16 +13,19 @@ drag any window by its title bar, a row of layout icons pops up, drop the window
 
 TidyGrid needs Accessibility access (System Settings → Privacy & Security → Accessibility).
 
-## Install on another Mac
-
-On any Mac where `gh` is logged in with access to this repo, this installs or updates the latest release:
+## Install
 
 ```bash
-gh release download -R bombadiltom/tidygrid -p TidyGrid.zip -D /tmp --clobber && { pkill -x TidyGrid; rm -rf /Applications/TidyGrid.app; ditto -x -k /tmp/TidyGrid.zip /Applications && open /Applications/TidyGrid.app; }
+brew tap bombadiltom/tap
+brew trust --cask bombadiltom/tap/tidygrid
+brew install --cask bombadiltom/tap/tidygrid
 ```
 
-Then allow TidyGrid under Accessibility. Files fetched with `gh` are not quarantined, so Gatekeeper does not block the (not notarized) app.
-Layouts and settings are per Mac.
+Or download `TidyGrid-<version>.zip` from [Releases](https://github.com/bombadiltom/tidygrid/releases) and move the app to Applications.
+The app is signed but not notarized, so on first launch macOS may ask you to allow it under
+System Settings → Privacy & Security → "Open Anyway".
+
+Then allow TidyGrid under Accessibility. Layouts and settings are per Mac.
 
 ## Build
 
@@ -30,7 +33,7 @@ Layouts and settings are per Mac.
 ./build.sh                          # builds build/TidyGrid.app (Apple silicon + Intel)
 ./build.sh install                  # also copies it to /Applications and starts it
 ./build.sh deploy macmini macmini2  # installs and starts it on other Macs over SSH
-./build.sh release                  # zips it and publishes a GitHub release (needs a clean, pushed HEAD)
+./build.sh release                  # zips it, publishes a GitHub release and prints the cask sha256 (needs a clean, pushed HEAD)
 ```
 
 `release` uses the version in `Resources/Info.plist`. Bump `CFBundleShortVersionString` for a new release;

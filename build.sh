@@ -58,8 +58,8 @@ case "${1:-}" in
   release)
     VERSION="$(plutil -extract CFBundleShortVersionString raw Resources/Info.plist)"
     TAG="v$VERSION"
-    ZIP=build/TidyGrid.zip
-    rm -f "$ZIP"
+    ZIP="build/TidyGrid-$VERSION.zip"
+    rm -f build/TidyGrid*.zip
     ditto -c -k --keepParent "$APP" "$ZIP"
 
     # Publish with the account that owns the repo, whichever gh account is active.
@@ -69,18 +69,21 @@ case "${1:-}" in
 
     if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
       gh release upload "$TAG" "$ZIP" -R "$REPO" --clobber
-      echo "Replaced TidyGrid.zip in release $TAG of $REPO"
+      echo "Replaced $(basename "$ZIP") in release $TAG of $REPO"
     else
       gh release create "$TAG" "$ZIP" -R "$REPO" --target "$(git rev-parse HEAD)" \
         --title "TidyGrid $VERSION" \
-        --notes "Install or update on a Mac with gh access to this repo:
+        --notes "Install with Homebrew:
 
 \`\`\`bash
-gh release download -R $REPO -p TidyGrid.zip -D /tmp --clobber && { pkill -x TidyGrid; rm -rf /Applications/TidyGrid.app; ditto -x -k /tmp/TidyGrid.zip /Applications && open /Applications/TidyGrid.app; }
+brew tap $OWNER/tap
+brew trust --cask $OWNER/tap/tidygrid
+brew install --cask $OWNER/tap/tidygrid
 \`\`\`
 
 Then allow TidyGrid under System Settings → Privacy & Security → Accessibility."
       echo "Published release $TAG of $REPO"
     fi
+    echo "sha256 $(shasum -a 256 "$ZIP" | cut -d' ' -f1)  (for the Homebrew cask)"
     ;;
 esac
