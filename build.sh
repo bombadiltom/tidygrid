@@ -3,12 +3,25 @@
 #   ./build.sh                    build only
 #   ./build.sh install            also copy to /Applications here and start it
 #   ./build.sh deploy HOST...     also copy to /Applications on each SSH host and start it there
-#   ./build.sh release            also zip it and publish it as a GitHub release of this repo
+#   ./build.sh release            also notarize it, publish it as a GitHub release of this repo
+#                                 and update the cask in the Homebrew tap
 #                                 (version from Resources/Info.plist; re-running replaces the zip)
+#
+# Signing: "Developer ID Application" when available, else "Apple Development", else ad hoc.
+# Using the same certificate for every build keeps the Accessibility permission across rebuilds
+# and between Homebrew installs and local builds. Override with SIGN_IDENTITY=...
+#
+# Releases need the Developer ID certificate and a notarytool keychain profile
+# (NOTARY_PROFILE, default "BluetoothBatteryWatch": the credentials are team-wide), created with
+#   xcrun notarytool store-credentials <profile> --apple-id <apple-id> --team-id K6QN2C7Q55
 set -euo pipefail
 cd "$(dirname "$0")"
 
-if [[ "${1:-}" == "release" ]]; then
+MODE="${1:-}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-BluetoothBatteryWatch}"
+TAP="${TAP:-bombadiltom/tap}"
+
+if [[ "$MODE" == "release" ]]; then
   # Fail before building: a release must match a commit that is on GitHub.
   [[ -z "$(git status --porcelain)" ]] || { echo "Commit your changes before releasing."; exit 1; }
   git fetch -q origin
@@ -28,15 +41,29 @@ cp Resources/Info.plist "$APP/Contents/Info.plist"
 plutil -replace CFBundleVersion -string "$(git rev-list --count HEAD 2>/dev/null || echo 1)" "$APP/Contents/Info.plist"
 [[ -f Resources/AppIcon.icns ]] && cp Resources/AppIcon.icns "$APP/Contents/Resources/"
 
-# A stable signing identity keeps the Accessibility permission across rebuilds.
-IDENTITY="${SIGN_IDENTITY:-Apple Development}"
-if ! codesign --force --options runtime --timestamp=none --sign "$IDENTITY" "$APP" 2>/dev/null; then
-  echo "No '$IDENTITY' certificate found, signing ad hoc (Accessibility must be granted again after each build)."
-  codesign --force --sign - "$APP"
+IDENTITIES="$(security find-identity -v -p codesigning 2>/dev/null || true)"
+if [[ -n "${SIGN_IDENTITY:-}" ]]; then
+  IDENTITY="$SIGN_IDENTITY"
+elif grep -q "Developer ID Application" <<<"$IDENTITIES"; then
+  IDENTITY="Developer ID Application"
+elif grep -q "Apple Development" <<<"$IDENTITIES"; then
+  IDENTITY="Apple Development"
+else
+  IDENTITY="-"
 fi
-echo "Built $APP ($(lipo -archs "$APP/Contents/MacOS/TidyGrid"))"
 
-case "${1:-}" in
+if [[ "$MODE" == "release" ]]; then
+  [[ "$IDENTITY" == Developer\ ID* ]] || { echo "Releases need a 'Developer ID Application' certificate."; exit 1; }
+  codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP"
+elif [[ "$IDENTITY" == "-" ]]; then
+  echo "No signing certificate found, signing ad hoc (Accessibility must be granted again after each build)."
+  codesign --force --sign - "$APP"
+else
+  codesign --force --options runtime --timestamp=none --sign "$IDENTITY" "$APP"
+fi
+echo "Built $APP ($(lipo -archs "$APP/Contents/MacOS/TidyGrid"), signed: $IDENTITY)"
+
+case "$MODE" in
   install)
     pkill -x TidyGrid || true
     rm -rf /Applications/TidyGrid.app
@@ -60,7 +87,23 @@ case "${1:-}" in
     TAG="v$VERSION"
     ZIP="build/TidyGrid-$VERSION.zip"
     rm -f build/TidyGrid*.zip
+
+    echo "Notarizing (usually a few minutes)"
     ditto -c -k --keepParent "$APP" "$ZIP"
+    SUBMISSION="$(xcrun notarytool submit "$ZIP" --keychain-profile "$NOTARY_PROFILE" --wait --output-format json)"
+    SUBMISSION_ID="$(plutil -extract id raw - <<<"$SUBMISSION")"
+    STATUS="$(plutil -extract status raw - <<<"$SUBMISSION")"
+    echo "Submission $SUBMISSION_ID: $STATUS"
+    if [[ "$STATUS" != "Accepted" ]]; then
+      xcrun notarytool log "$SUBMISSION_ID" --keychain-profile "$NOTARY_PROFILE" >&2
+      exit 1
+    fi
+    xcrun stapler staple "$APP"
+    spctl --assess --type execute "$APP"
+    # Re-zip so the download carries the stapled ticket.
+    rm -f "$ZIP"
+    ditto -c -k --keepParent "$APP" "$ZIP"
+    SHA256="$(shasum -a 256 "$ZIP" | cut -d' ' -f1)"
 
     # Publish with the account that owns the repo, whichever gh account is active.
     REPO="$(git remote get-url origin | sed -E 's#^(git@github.com:|https://github.com/)##; s#\.git$##')"
@@ -76,14 +119,29 @@ case "${1:-}" in
         --notes "Install with Homebrew:
 
 \`\`\`bash
-brew tap $OWNER/tap
-brew trust --cask $OWNER/tap/tidygrid
-brew install --cask $OWNER/tap/tidygrid
+brew tap $TAP
+brew trust --cask $TAP/tidygrid
+brew install --cask $TAP/tidygrid
 \`\`\`
 
+Or download TidyGrid-$VERSION.zip below and move the app to Applications.
 Then allow TidyGrid under System Settings → Privacy & Security → Accessibility."
       echo "Published release $TAG of $REPO"
     fi
-    echo "sha256 $(shasum -a 256 "$ZIP" | cut -d' ' -f1)  (for the Homebrew cask)"
+
+    # Point the cask at the new zip.
+    CASK="$(brew --repository "$TAP" 2>/dev/null)/Casks/tidygrid.rb"
+    if [[ -f "$CASK" ]]; then
+      sed -i '' -E "s/^  version \".*\"/  version \"$VERSION\"/; s/^  sha256 \".*\"/  sha256 \"$SHA256\"/" "$CASK"
+      if [[ -n "$(git -C "$(dirname "$CASK")" status --porcelain -- tidygrid.rb)" ]]; then
+        git -C "$(dirname "$CASK")" commit -q -m "tidygrid $VERSION" -- tidygrid.rb
+        git -C "$(dirname "$CASK")" push -q
+        echo "Updated and pushed the cask in $TAP to $VERSION"
+      else
+        echo "The cask in $TAP is already at $VERSION"
+      fi
+    else
+      echo "No $TAP tap found; set version \"$VERSION\" and sha256 \"$SHA256\" in the cask by hand."
+    fi
     ;;
 esac

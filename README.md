@@ -22,8 +22,7 @@ brew install --cask bombadiltom/tap/tidygrid
 ```
 
 Or download `TidyGrid-<version>.zip` from [Releases](https://github.com/bombadiltom/tidygrid/releases) and move the app to Applications.
-The app is signed but not notarized, so on first launch macOS may ask you to allow it under
-System Settings → Privacy & Security → "Open Anyway".
+Releases are signed with a Developer ID and notarized by Apple, so they open without warnings.
 
 Then allow TidyGrid under Accessibility. Layouts and settings are per Mac.
 
@@ -33,13 +32,15 @@ Then allow TidyGrid under Accessibility. Layouts and settings are per Mac.
 ./build.sh                          # builds build/TidyGrid.app (Apple silicon + Intel)
 ./build.sh install                  # also copies it to /Applications and starts it
 ./build.sh deploy macmini macmini2  # installs and starts it on other Macs over SSH
-./build.sh release                  # zips it, publishes a GitHub release and prints the cask sha256 (needs a clean, pushed HEAD)
+./build.sh release                  # notarizes it, publishes a GitHub release and updates the Homebrew cask
 ```
 
-`release` uses the version in `Resources/Info.plist`. Bump `CFBundleShortVersionString` for a new release;
-re-running with the same version replaces the zip in the existing release.
+`release` needs a clean, pushed HEAD, a "Developer ID Application" certificate and a notarytool keychain profile
+(see the top of `build.sh`). It uses the version in `Resources/Info.plist`: bump `CFBundleShortVersionString`
+for a new release; re-running with the same version replaces the zip in the existing release.
 
-The app is signed with your "Apple Development" certificate when one exists, so the Accessibility permission survives rebuilds.
+Every build is signed with the same certificate (Developer ID, else Apple Development), so the Accessibility
+permission survives rebuilds and switching between Homebrew and local builds.
 
 ## Diagnostics
 
