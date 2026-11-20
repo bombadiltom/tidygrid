@@ -97,7 +97,7 @@ final class DragWatcher {
         // The icons follow the window onto whichever screen the cursor is on.
         let screen = NSScreen.withMouse
         if !panel.isVisible || panel.screen != screen {
-            panel.show(on: screen)
+            panel.show(on: screen, mouse: NSEvent.mouseLocation)
         }
         panel.updateHover(mouse: NSEvent.mouseLocation)
     }

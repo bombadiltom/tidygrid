@@ -105,10 +105,11 @@ extension Array where Element == GridLayout {
 }
 
 enum PanelPosition: String, Codable, CaseIterable, Identifiable {
-    case top, bottom, left, right, center
+    case top, bottom, left, right, center, followMouse
     var id: String { rawValue }
     var title: String {
         switch self {
+        case .followMouse: "Follow Mouse"
         case .top: "Top"
         case .bottom: "Bottom"
         case .left: "Left"

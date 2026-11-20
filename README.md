@@ -5,6 +5,7 @@ drag any window by its title bar, a row of layout icons pops up, drop the window
 
 - **Layouts**: as many as you like, each with its own grid. Edit them in Settings → Layouts (drag across the grid to choose the area).
 - **Multiple screens**: the icons follow the cursor to whichever screen you drag onto, and the layout is applied there.
+- **Follow Mouse**: optionally the icons pop up right below the cursor instead of at a screen edge: to its right on the left third of the screen, centered in the middle, to its left on the right third.
 - **Option key**: hold it to hide the icons while dragging (or switch to "show only with Option").
 - **Quick Layout** (⌃⌥Space or the menu): drag across a grid to place the active window once, without saving a layout.
 - **Move Active Window to This Screen**: rescues windows stuck on a disconnected display.

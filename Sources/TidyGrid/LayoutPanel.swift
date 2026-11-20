@@ -86,7 +86,9 @@ final class LayoutPanel {
         return p
     }
 
-    func show(on screen: NSScreen) {
+    /// Shows the icons on `screen`. `mouse` (AppKit coordinates) places them in Follow Mouse mode.
+    /// The panel stays where it appeared until the drag moves to another screen, so it can be reached.
+    func show(on screen: NSScreen, mouse: CGPoint) {
         let prefs = AppSettings.shared.prefs
         self.screen = screen
         model.layouts = prefs.layouts
@@ -128,10 +130,32 @@ final class LayoutPanel {
         case .left: origin.x = vis.minX + Metrics.margin
         case .right: origin.x = vis.maxX - Metrics.margin - size.width
         case .center: break
+        case .followMouse: origin = followMouseOrigin(mouse: mouse, size: size, visible: vis)
         }
 
         panel.setFrame(CGRect(origin: origin, size: size).integral, display: true)
         panel.orderFrontRegardless()
+    }
+
+    /// Just below the cursor: hanging to the right of it on the left third of the screen,
+    /// centered under it in the middle third, hanging to the left of it on the right third.
+    private func followMouseOrigin(mouse: CGPoint, size: CGSize, visible vis: CGRect) -> CGPoint {
+        let gap: CGFloat = 28     // keeps the cursor off the icons when they appear
+        let inset: CGFloat = 8
+        let part = (mouse.x - vis.minX) / vis.width
+        var x: CGFloat
+        if part < 1.0 / 3 {
+            x = mouse.x - Metrics.padding
+        } else if part > 2.0 / 3 {
+            x = mouse.x - size.width + Metrics.padding
+        } else {
+            x = mouse.x - size.width / 2
+        }
+        var y = mouse.y - gap - size.height
+        if y < vis.minY + inset { y = mouse.y + gap }   // no room below the cursor: go above it
+        x = min(max(x, vis.minX + inset), vis.maxX - inset - size.width)
+        y = min(max(y, vis.minY + inset), vis.maxY - inset - size.height)
+        return CGPoint(x: x, y: y)
     }
 
     func hide() {
