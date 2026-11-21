@@ -12,13 +12,13 @@
 # and between Homebrew installs and local builds. Override with SIGN_IDENTITY=...
 #
 # Releases need the Developer ID certificate and a notarytool keychain profile
-# (NOTARY_PROFILE, default "BluetoothBatteryWatch": the credentials are team-wide), created with
+# (NOTARY_PROFILE, default "BombadilTom": the credentials are team-wide), created with
 #   xcrun notarytool store-credentials <profile> --apple-id <apple-id> --team-id K6QN2C7Q55
 set -euo pipefail
 cd "$(dirname "$0")"
 
 MODE="${1:-}"
-NOTARY_PROFILE="${NOTARY_PROFILE:-BluetoothBatteryWatch}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-BombadilTom}"
 TAP="${TAP:-bombadiltom/tap}"
 
 if [[ "$MODE" == "release" ]]; then
