@@ -44,5 +44,10 @@ permission survives rebuilds and switching between Homebrew and local builds.
 
 ## Diagnostics
 
-`/Applications/TidyGrid.app/Contents/MacOS/TidyGrid --self-test com.apple.finder` moves Finder's front window
-through every layout on every screen and writes wanted vs. actual frames to `~/Library/Logs/TidyGrid-selftest.log`.
+```bash
+pkill -x TidyGrid; open -a /Applications/TidyGrid.app --args --self-test com.apple.finder
+```
+
+moves Finder's front window through every layout on every screen and writes wanted vs. actual frames to
+`~/Library/Logs/TidyGrid-selftest.log`. Launch it with `open` so macOS checks TidyGrid's Accessibility access,
+not the terminal's.
