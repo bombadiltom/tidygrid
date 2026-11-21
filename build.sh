@@ -129,19 +129,19 @@ Then allow TidyGrid under System Settings → Privacy & Security → Accessibili
       echo "Published release $TAG of $REPO"
     fi
 
-    # Point the cask at the new zip.
-    CASK="$(brew --repository "$TAP" 2>/dev/null)/Casks/tidygrid.rb"
-    if [[ -f "$CASK" ]]; then
-      sed -i '' -E "s/^  version \".*\"/  version \"$VERSION\"/; s/^  sha256 \".*\"/  sha256 \"$SHA256\"/" "$CASK"
-      if [[ -n "$(git -C "$(dirname "$CASK")" status --porcelain -- tidygrid.rb)" ]]; then
-        git -C "$(dirname "$CASK")" commit -q -m "tidygrid $VERSION" -- tidygrid.rb
-        git -C "$(dirname "$CASK")" push -q
-        echo "Updated and pushed the cask in $TAP to $VERSION"
-      else
-        echo "The cask in $TAP is already at $VERSION"
-      fi
+    # Point the cask at the new zip. Clone the tap inside build/ rather than using Homebrew's copy:
+    # git then commits with the identity configured for this repo's location (e.g. an includeIf).
+    TAP_DIR=build/tap
+    rm -rf "$TAP_DIR"
+    git clone -q "git@github.com:bombadiltom/homebrew-tap.git" "$TAP_DIR"
+    CASK="$TAP_DIR/Casks/tidygrid.rb"
+    sed -i '' -E "s/^  version \".*\"/  version \"$VERSION\"/; s/^  sha256 \".*\"/  sha256 \"$SHA256\"/" "$CASK"
+    if [[ -n "$(git -C "$TAP_DIR" status --porcelain -- Casks/tidygrid.rb)" ]]; then
+      git -C "$TAP_DIR" commit -q -m "tidygrid $VERSION" -- Casks/tidygrid.rb
+      git -C "$TAP_DIR" push -q
+      echo "Updated and pushed the cask in $TAP to $VERSION"
     else
-      echo "No $TAP tap found; set version \"$VERSION\" and sha256 \"$SHA256\" in the cask by hand."
+      echo "The cask in $TAP is already at $VERSION"
     fi
     ;;
 esac
