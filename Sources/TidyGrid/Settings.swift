@@ -185,13 +185,21 @@ final class AppSettings: ObservableObject {
         didSet { if prefs != oldValue { save() } }
     }
 
+    /// The bundle identifier up to version 1.1. Its settings are copied over once.
+    private static let legacyDomain = "app.tidygrid.TidyGrid"
+
     private init() {
-        if let data = UserDefaults.standard.data(forKey: Self.key),
-           var p = try? JSONDecoder().decode(Prefs.self, from: data) {
+        var data = UserDefaults.standard.data(forKey: Self.key)
+        var migrated = false
+        if data == nil, let old = UserDefaults(suiteName: Self.legacyDomain)?.data(forKey: Self.key) {
+            data = old
+            migrated = true
+        }
+        if let data, var p = try? JSONDecoder().decode(Prefs.self, from: data) {
             let before = p
             p.mergeNewDefaults()
             prefs = p
-            if p != before { save() }
+            if migrated || p != before { save() }
         } else {
             prefs = Prefs()
         }

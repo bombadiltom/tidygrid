@@ -13,7 +13,7 @@ Window Tidy, so keep it small: no features beyond what the README lists unless a
   - `AX.swift`: Accessibility helpers and `NSScreen` coordinate conversion
   - `Settings.swift`: `GridLayout`, `Prefs` (one JSON blob in UserDefaults), default layouts and their migration
   - `SettingsView.swift`, `Views.swift`, `QuickLayout.swift`, `HotKeys.swift` (Carbon hot keys), `SelfTest.swift`
-- `Resources/Info.plist`: bundle id `app.tidygrid.TidyGrid`; `CFBundleShortVersionString` is the release version
+- `Resources/Info.plist`: bundle id `de.idiotentruppe.tidygrid` (until 1.1: `app.tidygrid.TidyGrid`, settings are migrated from it); `CFBundleShortVersionString` is the release version
 - `build.sh`: the only build entry point (SwiftPM + manual .app bundle); `scripts/make-icon.swift` makes `AppIcon.icns`
 
 ## Build, run, ship
